@@ -1,6 +1,6 @@
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
-**Table of Contents** 
+**Table of Contents**
 
 - [AltIRC](#altirc)
   - [Transport Protocol Binding](#transport-protocol-binding)
@@ -27,6 +27,32 @@
     - [User-to-User Messaging](#user-to-user-messaging)
       - [privmsg](#privmsg)
       - [notice](#notice)
+  - [Object Settings](#object-settings)
+      - [Setting Object](#setting-object)
+    - [Channel Settings](#channel-settings)
+      - [Setting Specification](#setting-specification)
+      - [Standard Settings](#standard-settings)
+        - [secret](#secret)
+        - [topic](#topic)
+        - [no-external](#no-external)
+        - [topic-lock](#topic-lock)
+        - [moderated](#moderated)
+        - [invite-only](#invite-only)
+        - [ban](#ban)
+        - [exempt](#exempt)
+        - [invex](#invex)
+        - [quiet](#quiet)
+    - [User Settings](#user-settings)
+      - [Setting Specification](#setting-specification-1)
+      - [Standard Settings](#standard-settings-1)
+        - [invisible](#invisible)
+        - [cloak](#cloak)
+    - [Channel Member Settings](#channel-member-settings)
+      - [Setting Specification](#setting-specification-2)
+      - [Standard Settings](#standard-settings-2)
+        - [op](#op)
+        - [voice](#voice)
+        - [halfop](#halfop)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -231,6 +257,8 @@ The arguments shall be as follows:
   - `user`: Required. String. The user's desired username.
   - `realname`: Required. String. The user's desired realname.
   - `caps: Required. Object. Reserved; set to an empty object.
+  - `lang`: Optional. String. An ISO language code specifying the user's
+    preferred language for server messages.
 
 Example:
 
@@ -240,7 +268,8 @@ Example:
         "nick": "the-user",
         "user": "theuser",
         "realname": "The User",
-        "caps": {}
+        "caps": {},
+        "lang": "en-gb"
       }
     }
 
@@ -281,9 +310,12 @@ The arguments shall be as follows:
 
       - PREFIXES
 
-      - USER MODES
+      - `user-settings`: Required. An array of User Setting Specifications.
 
-      - CHANNEL MODES
+      - `channel-settings`: Required. An array of Channel Setting Specifications.
+
+      - `channel-member-settings`: Required. An array of Channel Member Setting
+        Specifications.
 
   - `network`: Required. An object containing the following:
 
@@ -351,7 +383,42 @@ Example:
           "start-time": "2016-01-01T12:00:00Z",
           "num-clients": {"cur":2,"highest":2},
           "num-servers": {"cur":0,"highest":0},
-          "total-connections": 48
+          "total-connections": 48,
+          "channel-settings": [
+            {
+              "id": "urn:irc:setting:channel:no-external",
+              "local-name": "no-external",
+              "legacy-char": "n",
+              "title": {"en": "No External Messages"},
+              "description: {"en": "Only allow the channel to be messaged by users joined to it."},
+              "type": "bool"
+            },
+            ...
+          ],
+          "user-settings": [
+            {
+              "id": "urn:irc:setting:user:invisible",
+              "local-name": "invisible",
+              "legacy-char": "i",
+              "title": {"en": "Invisible"},
+              "description": {"en": "Prevents you from showing up in public user listings."},
+              "type": "bool"
+            },
+            ...
+          ],
+          "channel-member-settings": [
+            {
+              "id": "urn:irc:setting:channel-member:op",
+              "local-name": "op",
+              "legacy-char": "o",
+              "sigil": "@",
+              "sigil-priority": 10,
+              "title": {"en": "Channel Operator"},
+              "description": {"en": "Authorizes the channel member to configure the channel, and ban and kick other members."},
+              "type": "bool"
+            },
+            ...
+          ]
         },
         "network": {
           "name": "FOONET",
@@ -442,20 +509,33 @@ The following arguments are used:
     to another channel. The case specified in this item is the official case
     for the channel.
 
-  - `topic`: Optional. Object. If a topic is set, this MUST be present and set to
-    a valid Topic Specification. Absence, or specification as `null` indicates that
-    a topic is not set.
+  - `settings`: Required. A JSON object mapping the URIs of channel settings
+    to Channel Setting Objects expressing the current values of those settings.
 
-  - `mode`: Required. Object. [INDICATES CHANNEL MODES TODO]
+Example:
 
-A Topic Specification is a JSON object with the following items:
-
-  - `message`: Required. String. The topic.
-
-  - `author`: Optional. If present, MUST be a valid Message Origin Specification.
-    Indicates who last changed the topic.
-
-  - `time`: Optional. String. If present, MUST be an ISO 8601 UTC timestamp.
+    {
+      "from": {
+        "server": "a.b.c"
+      },
+      "cmd": "@channel-welcome",
+      "args": {
+        "channel": "#foo",
+        "settings": {
+          "urn:irc:setting:channel:topic": {
+            "value": "This is the channel topic.",
+            "change-time": "2016-01-01T12:00:00Z",
+            "changed-by": {"nick": "the-user", "user": "theuser", "host": "user.example.com"}
+          },
+          "urn:irc:setting:channel:no-external": {
+            "value": true
+          },
+          "urn:irc:setting:channel:topic-lock": {
+            "value": true
+          }
+        }
+      }
+    }
 
 #### @names
 
@@ -474,7 +554,38 @@ The following arguments are used:
     case, all but the final `@names` notifications for a channel have `more`
     set to true.
 
-A Channel Member Specification is any valid User Origin Specification.
+A Channel Member Specification is any valid User Origin Specification, but may
+have the following additional items:
+
+  - `settings`: Required. A JSON object mapping the URIs of channel settings to
+    Channel Member Setting Objects expressing the current values of those
+    settings.
+
+Example:
+
+    {
+      "from": {
+        "server": "a.b.c"
+      },
+      "cmd": "@names",
+      "args": {
+        "channel": "#foo",
+        "names": [
+          {
+            "nick": "the-user",
+            "user": "theuser",
+            "host": "user.example.com",
+            "settings": {
+              "urn:irc:setting:channel-member:op": {
+                "value": true
+              }
+            }
+          }
+        ],
+        "more": false
+      }
+    }
+
 
 ### User-to-User Messaging
 
@@ -576,4 +687,313 @@ use the `notice` item to avoid causing recursive messaging loops.
       }
     }
 
+## Object Settings
+
+IRC has the concept of channel and user modes. These are very limited and are problematic for several reasons:
+
+  - They have a single-letter namespace, severely limiting the number of modes
+    that can be defined.
+
+  - Somewhat as a consequence of this, different IRC servers may assign subtly
+    different or completely different functionality to the same mode character.
+
+  - The use of single characters is not user friendly or intuitive. The meaning
+    of modes is not immediately clear.
+
+  - Because the meaning of a mode character can vary between networks,
+    GUI clients cannot neccessarily determine the meaning of a mode character
+    and thereby offer a graphical interface for mode control.
+
+The following types of channel mode have been observed:
+
+  - Boolean modes. These are either set or unset.
+
+  - Singleton modes with argument. These modes are either unset or set. When
+    they are set, they have a single argument. Setting the mode again changes
+    the argument, rather than creating an additional setting.
+
+  - Hostmask list modes. These modes express a list of zero or more items,
+    namely of hostmasks.
+
+  - Channel member modes. Though these are traditionally expressed in the form
+    `channel +o user`, similarly to a hostmask list, they can be better
+    considered as modes set on a channel member object, which is an object
+    uniquely identified by the tuple (channel, user). These modes are always
+    boolean.
+
+Only boolean user modes have been observed.
+
+The mode system is generalised into an *object settings* scheme. *Object* here
+means anything which can have settings set on it. The *object settings* schem
+is designed to facilitate compatibility, where possible, with legacy clients.
+
+The channel topic is in IRC a special case, but in a generalised object
+settings system there is no reason not to treat it as just another setting.
+Traditionally servers have tracked who last set the topic and at what time.
+Since it may not be desired to track this information for every setting,
+servers are allowed to publish last change information for any setting, but are
+not required to do so.
+
+A server supports zero or more channel modes and advertises *Channel Setting
+Specifications* at registration time in its `@welcome` message.
+
+#### Setting Object
+
+A User, Channel or Channel Member Setting Object is a JSON object communicating
+the current state of a User, Channel or Channel Member Setting with regards to
+a specific user, channel or (channel, user) tuple.
+
+Each Setting Object has the following items:
+
+  - `value`: Optional. If not specified or specified as `null`, it is assumed
+    that the setting is not set.
+
+    For boolean, string and integer values, this is that value.
+
+    For `multi-hostmask` settings, this is an array of JSON objects of the
+    following form:
+
+      - `mask`: Required. String. The hostmask.
+
+      - `added-by`: Optional. An Origin Specification. Servers MAY choose not
+        to store this data.
+
+      - `add-time`: Optional. String. An ISO 8601 UTC timestamp expressing when
+        the mask was added. Servers MAY choose not to store this data.
+
+  - `change-time`: Optional. String. An ISO 8601 UTC timestamp expressing
+    when the setting was last changed. Servers MAY choose to store and provide
+    this information only for some settings.
+
+  - `changed-by`: Optional. An Origin Specification. Servers MAY choose to store
+    and provide this information only for some settings.
+
+### Channel Settings
+
+#### Setting Specification
+
+A Channel Setting Specification is a JSON object specifying information about a
+type of channel setting which the server permits to be assigned to channels
+created on the server. The server MAY also permit arbitrary settings to be
+attached to channels, but the server SHOULD advertise specifications for
+all channel settings to which it applies special processing.
+
+Each Channel Setting Specification has the following items:
+
+  - `id`: Required. String. A URI uniquely identifying the **semantic meaning**
+    of the channel setting.
+
+  - `local-name`: Required. String. A string which is unique at network scope.
+    MUST be comprised only of the letters `[a-zA-Z0-9-]`. This is only guaranteed
+    to be unique network-wide, though specifications for standard settings MAY
+    specify recommended local names; such names SHOULD be used where possible.
+
+  - `title`: Required. A langstring. This is a human-readable string labelling
+    the setting. It should generally be in title case.
+
+  - `description`: Optional. A langstring. This is a human-readable string
+    providing additional information on the setting. The string may be
+    arbitrarily long, and should be long enough to allow a user to determine
+    how to apply the setting, at least in simple cases.
+
+  - `legacy-char`: Optional. A string containing a single ASCII character.
+    If this is specified, the setting is mapped to a legacy mode character.
+    Settings are not obliged to have legacy characters. Specifications
+    for standard settings MAY specify recommended legacy characters; such
+    characters SHOULD be used where possible (i.e. where they would not
+    conflict with an existing setting using that character).
+
+  - `value-type`: Required. String. Specifies the value type. Supported values:
+
+      - "bool"
+      - "string"
+      - "int"
+      - "multi-hostmask"
+
+  - `max-len`: Optional. Integer. If specified, specifies the maximum length
+    for this setting. Only applicable for settings with a value type of
+    "string" (in which case it specifies the maximum string length in bytes) or
+    "multi-hostmask" (in which case it specifies the maximum number of hostmask
+    entries).
+
+#### Standard Settings
+
+##### secret
+
+  - ID: "urn:irc:setting:channel:secret"
+  - Recommended Local Name: "secret"
+  - Recommended Legacy Character: "s"
+  - Suggested Title (`en`): "Secret Channel"
+  - Suggested Description (`en`): "Hide the channel from public listings."
+  - Type: Boolean.
+
+##### topic
+
+  - ID: "urn:irc:setting:channel:topic"
+  - Recommended Local Name: "topic"
+  - Recommended Legacy Character: N/A
+  - Suggested Title (`en`): "Channel Topic"
+  - Suggested Description (`en`): "Set a message to be displayed to anyone joining the channel."
+  - Type: String.
+
+##### no-external
+
+  - ID: "urn:irc:setting:channel:no-external"
+  - Recommended Local Name: "no-external"
+  - Recommended Legacy Character: "n"
+  - Suggested Title (`en`): "No External Messages"
+  - Suggested Description (`en`): "Only allow the channel to be messaged by users joined to it."
+  - Type: Boolean.
+
+This setting, when set, blocks messages sent to channels by any user which is not a member of that channel.
+
+##### topic-lock
+
+  - ID: "urn:irc:setting:channel:topic-lock"
+  - Recommended Local Name: "topic-lock"
+  - Recommended Legacy Character: "t"
+  - Suggested Title (`en`): "Topic Lock"
+  - Suggested Description (`en`): "Only allow the channel topic to be changed by operators."
+  - Type: Boolean.
+
+This setting, when set, prevents changes to the channel topic by anyone who is not a channel operator.
+
+##### moderated
+
+  - ID: "urn:irc:setting:channel:moderated"
+  - Recommended Local Name: "moderated"
+  - Recommended Legacy Character: "m"
+  - Suggested Title (`en`): "Moderated"
+  - Suggested Description (`en`): "Only allow people with voice or channel operators to message the channel."
+  - Type: Boolean.
+
+This setting, when set, prevents anyone who is not a channel operator and who does not have voice to message the channel.
+
+##### invite-only
+
+  - ID: "urn:irc:setting:channel:invite-only"
+  - Recommended Local Name: "invite-only"
+  - Recommended Legacy Character: "i"
+  - Suggested Title (`en`): "Invite Only"
+  - Suggested Description (`en`): "Only allow people who have been invited to the channel to enter it."
+  - Type: Boolean.
+
+##### ban
+
+  - ID: "urn:irc:setting:channel:ban"
+  - Recommended Local Name: "ban"
+  - Recommended Legacy Character: "b"
+  - Suggested Title (`en`): "Ban Hostmask"
+  - Suggested Description (`en`): "Ban anyone matching the given hostmask from joining or messaging the channel."
+  - Type: Multiple Hostmask.
+
+##### exempt
+
+  - ID: "urn:irc:setting:channel:exempt"
+  - Recommended Local Name: "exempt"
+  - Recommended Legacy Character: "e"
+  - Suggested Title (`en`): "Exempt Hostmask From Bans"
+  - Suggested Description (`en`): "Exempt anyone matching the given hostmask from any ban hostmasks."
+  - Type: Multiple Hostmask.
+
+##### invex
+
+  - ID: "urn:irc:setting:channel:invex"
+  - Recommended Local Name: "invex"
+  - Recommended Legacy Character: "I"
+  - Suggested Title (`en`): "Exempt Hostmask From Invite-Only Requirement"
+  - Suggested Description (`en`): "Exempt anyone matching the given hostmask from any invite-only requirement."
+  - Type: Multiple Hostmask.
+
+##### quiet
+
+  - ID: "urn:irc:setting:channel:quiet"
+  - Recommended Local Name: "quiet"
+  - Recommended Legacy Character: "q"
+  - Suggested Title (`en`): "Quiet Hostmask"
+  - Suggested Description (`en`): "Prevent anyone matching the given hostmask from messaging the channel."
+
+### User Settings
+
+#### Setting Specification
+
+A User Setting Specification has the same form as a Channel Setting
+Specification, but specifies a setting that can be set on a user. The
+`legacy-char` namespace (but not the `local-name` namespace) is distinct.
+
+#### Standard Settings
+
+##### invisible
+
+  - ID: "urn:irc:setting:user:invisible"
+  - Recommended Local Name: "invisible"
+  - Recommended Legacy Character: "i"
+  - Suggested Title (`en`): "Invisible"
+  - Suggested Description (`en`): "Prevents you from showing up in public user listings."
+  - Type: Boolean.
+
+##### cloak
+
+  - ID: "urn:irc:setting:user:cloak"
+  - Recommended Local Name: "cloak"
+  - Recommended Legacy Character: "x"
+  - Suggested Title (`en`): "Hostmask Cloak"
+  - Suggested Description (`en`): "Masks your hostname."
+  - Type: Boolean.
+
+### Channel Member Settings
+
+#### Setting Specification
+
+A Channel Member Setting Specification has the same form as a Channel Setting
+Specification, but specifies a setting that can be set on a channel membership
+object, which is the combination of a channel and a user. The `legacy-char` and
+`local-name` namespaces are shared with those of the Channel Setting namespace.
+
+Because a Channel Member object is destroyed when a user leaves the channel,
+these settings do not survive leaving and rejoining a channel.
+
+The Specification object for a Channel Member Setting may also contain the
+following item:
+
+  - `sigil`: Optional. String. A single ASCII character which is used to
+    concisely represent the fact that a channel member has this setting set.
+
+  - `sigil-priority`: Optional. Integer. A value which specifies which sigil
+    should be used when a channel member has multiple sigil-conferring settings
+    set. The setting with the highest value wins.
+
+#### Standard Settings
+
+##### op
+
+  - ID: "urn:irc:setting:channel-member:op"
+  - Recommended Local Name: "op"
+  - Recommended Legacy Character: "o"
+  - Recommended Legacy Sigil: "@"
+  - Suggested Title (`en`): "Channel Operator"
+  - Suggested Description (`en`): "Authorizes the channel member to configure
+    the channel, and ban and kick other members."
+  - Type: Boolean.
+
+##### voice
+
+  - ID: "urn:irc:setting:channel-member:voice"
+  - Recommended Local Name: "voice"
+  - Recommended Legacy Character: "v"
+  - Recommended Legacy Sigil: "+"
+  - Suggested Title (`en`): "Voiced Member"
+  - Suggested Description (`en`): "Allows the channel member to speak when the
+    channel is moderated."
+  - Type: Boolean.
+
+##### halfop
+
+  - ID: "urn:irc:setting:channel-member:halfop"
+  - Recommended Local Name: "halfop"
+  - Recommended Legacy Character: "h"
+  - Recommended Legacy Sigil: "%"
+  - Suggested Title (`en`): "Channel Half-Operator"
+  - Suggested Description (`en`): "A more limited type of channel operator. Cannot kick operators."
+  - Type: Boolean.
 
